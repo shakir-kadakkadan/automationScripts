@@ -113,7 +113,7 @@ def create_reel_video(
     dpi = 100
     figsize = (width_px / dpi, height_px / dpi)
 
-    pause_seconds = 1  # Pause at end
+    pause_seconds = 3  # Pause at end
     animation_frames = fps * duration_seconds
     pause_frames = fps * pause_seconds
     total_frames = animation_frames + pause_frames
@@ -190,10 +190,10 @@ def create_reel_video(
                       bbox=dict(boxstyle='round,pad=0.4', facecolor='#1a1a1a',
                                edgecolor=gold_color, linewidth=2))
 
-    # Date display (between boxes) - centered
-    date_text = ax.text(0.5, 0.91, '', transform=ax.transAxes,
-                       fontsize=14 * text_scale, color='white',
-                       ha='center', va='center', fontweight='bold')
+    # Date display - left aligned after NIFTY box
+    date_text = ax.text(0.32, 0.91, '', transform=ax.transAxes,
+                       fontsize=16 * text_scale, color='white',
+                       ha='left', va='center', fontweight='bold')
 
     # Value labels at line ends
     nifty_label = ax.text(0, 0, '', fontsize=14 * text_scale, fontweight='bold',
