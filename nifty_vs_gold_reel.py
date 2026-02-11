@@ -10,6 +10,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 from matplotlib.animation import FuncAnimation, FFMpegWriter
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from PIL import Image
+from io import BytesIO
 from datetime import datetime
 import json
 import subprocess
@@ -172,28 +175,59 @@ def create_reel_video(
 
     # Subtitle with SIP info
     start_date = df['date'].iloc[0].strftime('%B %Y')
-    subtitle = ax.text(0.5, 1.05, f'₹10K SIP every month since {start_date}',
+    subtitle = ax.text(0.5, 1.075, f'₹10K SIP every month since {start_date}',
                       transform=ax.transAxes,
                       fontsize=17 * text_scale, color='#cccccc', fontweight='bold',
                       ha='center', va='top')
 
-    # Value boxes with names inside
-    nifty_box = ax.text(0.15, 0.91, '', transform=ax.transAxes,
+    # Value boxes with names inside (moved further apart)
+    nifty_box = ax.text(0.08, 0.93, '', transform=ax.transAxes,
                        fontsize=17 * text_scale, color=nifty_color, ha='center',
                        fontweight='bold',
                        bbox=dict(boxstyle='round,pad=0.4', facecolor='#1a1a1a',
                                 edgecolor=nifty_color, linewidth=2))
 
-    gold_box = ax.text(0.85, 0.91, '', transform=ax.transAxes,
+    gold_box = ax.text(0.92, 0.93, '', transform=ax.transAxes,
                       fontsize=17 * text_scale, color=gold_color, ha='center',
                       fontweight='bold',
                       bbox=dict(boxstyle='round,pad=0.4', facecolor='#1a1a1a',
                                edgecolor=gold_color, linewidth=2))
 
+    # Percentage labels (smaller text below boxes)
+    nifty_pct_text = ax.text(0.08, 0.86, '', transform=ax.transAxes,
+                            fontsize=13 * text_scale, color=nifty_color, ha='center',
+                            fontweight='bold')
+    gold_pct_text = ax.text(0.92, 0.86, '', transform=ax.transAxes,
+                           fontsize=13 * text_scale, color=gold_color, ha='center',
+                           fontweight='bold')
+
+    # Total invested display - above date
+    invested_text = ax.text(0.32, 0.95, '', transform=ax.transAxes,
+                           fontsize=12 * text_scale, color='#aaaaaa',
+                           ha='left', va='center', fontweight='bold')
+
     # Date display - left aligned after NIFTY box
     date_text = ax.text(0.32, 0.91, '', transform=ax.transAxes,
                        fontsize=16 * text_scale, color='white',
                        ha='left', va='center', fontweight='bold')
+
+    # Instagram handle at bottom with icon
+    insta_icon_url = 'https://upload.wikimedia.org/wikipedia/commons/thumb/e/e7/Instagram_logo_2016.svg/132px-Instagram_logo_2016.svg.png'
+    try:
+        icon_response = requests.get(insta_icon_url)
+        icon_img = Image.open(BytesIO(icon_response.content))
+        icon_img = icon_img.resize((40, 40), Image.LANCZOS)
+        imagebox = OffsetImage(icon_img, zoom=1)
+        ab = AnnotationBbox(imagebox, (0.42, -0.08), transform=ax.transAxes,
+                           frameon=False, box_alignment=(1, 0.5))
+        ax.add_artist(ab)
+    except Exception:
+        pass  # Skip icon if download fails
+
+    insta_text = ax.text(0.44, -0.08, '@algo_vs_discretionary_trader',
+                        transform=ax.transAxes,
+                        fontsize=12 * text_scale, color='#888888',
+                        ha='left', va='center', fontweight='bold')
 
     # Value labels at line ends
     nifty_label = ax.text(0, 0, '', fontsize=14 * text_scale, fontweight='bold',
@@ -201,8 +235,7 @@ def create_reel_video(
     gold_label = ax.text(0, 0, '', fontsize=14 * text_scale, fontweight='bold',
                         color=gold_color, va='center')
 
-    # Style axes
-    ax.set_ylabel('Portfolio Value (₹)', fontsize=14 * text_scale, color='white', labelpad=10)
+    # Style axes (no y-axis label)
 
     # Format y-axis to show lakhs/crores
     def format_lakhs(x, pos):
@@ -215,7 +248,8 @@ def create_reel_video(
         else:
             return f'₹{x/1000:.0f}K'
     ax.yaxis.set_major_formatter(plt.FuncFormatter(format_lakhs))
-    ax.tick_params(colors='white', labelsize=10 * text_scale)
+    ax.tick_params(axis='y', length=0)  # Hide Y-axis tick marks
+    ax.set_yticklabels([])  # Hide Y-axis scale labels
     ax.grid(True, alpha=0.2, color='white')
 
     # Ensure 0 is included in y-ticks
@@ -234,12 +268,15 @@ def create_reel_video(
         line_nifty.set_data([], [])
         line_gold.set_data([], [])
         date_text.set_text('')
+        invested_text.set_text('')
         nifty_label.set_text('')
         gold_label.set_text('')
         nifty_box.set_text('NIFTY 50\n₹0')
         gold_box.set_text('GOLD\n₹0')
-        return [line_nifty, line_gold, date_text, nifty_label, gold_label,
-                nifty_box, gold_box]
+        nifty_pct_text.set_text('0%')
+        gold_pct_text.set_text('0%')
+        return [line_nifty, line_gold, date_text, invested_text, nifty_label, gold_label,
+                nifty_box, gold_box, nifty_pct_text, gold_pct_text]
 
     def animate(frame):
         # Calculate progress (clamp to animation_frames for pause at end)
@@ -264,13 +301,6 @@ def create_reel_video(
         nifty_end = nifty_show[-1]
         gold_end = gold_show[-1]
 
-        offset = len(df) * 0.02
-        nifty_label.set_position((x_end + offset, nifty_end))
-        nifty_label.set_text(f'₹{nifty_end/100000:.1f}L')
-
-        gold_label.set_position((x_end + offset, gold_end))
-        gold_label.set_text(f'₹{gold_end/100000:.1f}L')
-
         # Format values in lakhs/crores
         def fmt_val(v):
             if v >= 10000000:
@@ -278,12 +308,31 @@ def create_reel_video(
             else:
                 return f'₹{v/100000:.1f}L'
 
+        offset = len(df) * 0.02
+        nifty_label.set_position((x_end + offset, nifty_end))
+        nifty_label.set_text(fmt_val(nifty_end))
+
+        gold_label.set_position((x_end + offset, gold_end))
+        gold_label.set_text(fmt_val(gold_end))
+
+        # Calculate total invested and % returns
+        invested = invested_series.iloc[n_show - 1]
+        nifty_pct = ((nifty_end - invested) / invested) * 100
+        gold_pct = ((gold_end - invested) / invested) * 100
+
+        # Update total invested text
+        invested_text.set_text(f'Total Invested: {fmt_val(invested)}')
+
         # Update boxes with name and value
         nifty_box.set_text(f'NIFTY 50\n{fmt_val(nifty_end)}')
         gold_box.set_text(f'GOLD\n{fmt_val(gold_end)}')
 
-        return [line_nifty, line_gold, date_text, nifty_label, gold_label,
-                nifty_box, gold_box]
+        # Update percentage labels (smaller text below boxes)
+        nifty_pct_text.set_text(f'{nifty_pct:+.0f}%')
+        gold_pct_text.set_text(f'{gold_pct:+.0f}%')
+
+        return [line_nifty, line_gold, date_text, invested_text, nifty_label, gold_label,
+                nifty_box, gold_box, nifty_pct_text, gold_pct_text]
 
     print(f"Creating animation with {total_frames} frames...")
 
