@@ -1,4 +1,4 @@
-# Automation Scripts Multi-Purpose
+# miscellaneous Scripts Multi-Purpose
 
 This repository contains a collection of multi-purpose scripts designed for automation and semi-automation processes.
 
